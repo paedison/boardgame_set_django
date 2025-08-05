@@ -1,3 +1,8 @@
+const CSRFToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];
+
 export const constants = {
     BASE_URL: 'http://localhost:8000/api/game/',
     WINDOW_WIDTH: 1280,
@@ -13,4 +18,5 @@ export const constants = {
 
     MESSAGE_BOX_WIDTH: 480,
     MESSAGE_BOX_HEIGHT: 250,
+    CSRFToken: CSRFToken,
 }

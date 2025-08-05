@@ -1,4 +1,3 @@
-import { generateDeck } from "./deck.js";
 import { constants } from "../constants.js";
 
 class CardSprite extends Phaser.GameObjects.Image {
@@ -74,7 +73,7 @@ export class MainScene extends Phaser.Scene {
 
     resetProperties() {
         this.cardSprites = [];
-        this.selectedCards = [];
+        this.selectedCardSprites = [];
         this.hintSets = [];
         this.hintIndex = 0;
         this.score = 0;
@@ -109,7 +108,6 @@ export class MainScene extends Phaser.Scene {
 
     addLog(message) {
         const timestamp = new Date().toLocaleTimeString();
-        console.log(this.logMessages);
         this.logMessages.push(`[${timestamp}] ${message}`);
 
         // 최근 5개만 표시
@@ -200,7 +198,7 @@ export class MainScene extends Phaser.Scene {
             padding: { x: 10, y: 5 }
         }).setInteractive();
         hintButton.on('pointerdown', () => {
-            this.hintSets.length === 0 ? this.requestHints() : this.showNextHint()
+            this.hintSets.length === 0 ? this.requestHints() : this.showNextHint();
         });
     }
 
@@ -211,8 +209,7 @@ export class MainScene extends Phaser.Scene {
                 const possibleSets = data.possible_sets;
                 if (possibleSets.length === 0) {
                     this.addLog('❌ 세트가 없습니다. 카드를 교체합니다!');
-                    // this.messageText.setText('❌ 세트가 없습니다. 카드를 교체합니다!');
-                    this.replaceCards(data.new_cards);
+                    this.replaceCards(data.newCards);
                 } else {
                     this.hintSets = possibleSets; // [[id1, id2, id3], [id4, id5, id6], ...]
                     this.hintIndex = 0;
@@ -222,15 +219,15 @@ export class MainScene extends Phaser.Scene {
     }
 
     showNextHint() {
-        const hintSets = this.hintSets
         const hintIndex = this.hintIndex
-        const currentHint = hintSets[hintIndex];
+        const currentHint = this.hintSets[hintIndex];
+        const hintCount = this.hintSets.length
 
-        this.hintText.setText(`힌트 ${hintIndex + 1}/${hintSets.length}`);
-        this.addLog('✅ 가능한 세트를 표시했습니다');
-
+        this.hintText.setText(`힌트 ${hintIndex + 1}/${hintCount}`);
         this.highlightHint(currentHint);
-        this.hintIndex = (hintIndex + 1) % hintSets.length; // 순환
+        this.hintIndex = (hintIndex + 1) % hintCount; // 순환
+
+        this.addLog('✅ 가능한 세트를 표시했습니다');
     }
 
     highlightHint(currentHint) {
@@ -260,15 +257,6 @@ export class MainScene extends Phaser.Scene {
                     sprite.setAlpha(0).setInteractive();
                     this.cardSprites.push(sprite);
 
-                    // const x = 100 + (index % 4) * 150;
-                    // const y = 100 + Math.floor(index / 4) * 200;
-                    //
-                    // const sprite = this.add.sprite(x, y, 'cards', card.frame_name)
-                    //     .setAlpha(0)
-                    //     .setInteractive();
-                    // sprite.cardData = card;
-                    // cardSprites.push(sprite);
-
                     this.tweens.add({
                         targets: sprite,
                         alpha: 1,
@@ -282,44 +270,60 @@ export class MainScene extends Phaser.Scene {
             }
         });
     }
-    //
-    // replaceCards(newCards) {
-    //     this.cardSprites.forEach(sprite => sprite.destroy());
-    //     this.cardSprites = [];
-    //     this.createNewSprites(newCards);
-    // }
 
-    handleCardSelection(cardSprite) {
+    async handleCardSelection(cardSprite) {
+        let selected = this.selectedCardSprites;
         if (cardSprite.selected) {
-            this.selectedCards.push(cardSprite);
+            selected.push(cardSprite);
         } else {
-            this.selectedCards = this.selectedCards.filter(c => c !== cardSprite);
+            selected.pop(cardSprite);
         }
 
-        if (this.selectedCards.length === 3) {
-            setTimeout(() => {
-                const isSet = this.checkSet(this.selectedCards.map(c => c.cardData));
-                if (isSet) {
+        if (selected.length === 3) {
+            const cardIds = this.getCardIds(selected);
+
+            try {
+                const response = await fetch(`${constants.BASE_URL}validate/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': constants.CSRFToken,
+                    },
+                    body: JSON.stringify({ 'cardIds': cardIds })
+                });
+
+                const result = await response.json();
+                const newCards = result.newCards;
+
+                if (newCards.length === 3) {
                     this.score += 1;
-                    console.log("✅ 세트 성공! 점수:", this.score);
-                    this.selectedCards.forEach(c => c.deselect());
-                    this.selectedCards = [];
-                    // TODO: 세트 카드 교체 로직
+                    this.scoreText.setText(`Score: ${this.score}`);
+
+                    // 카드 교체
+                    selected.forEach((cardSprite, i) => {
+                        const newCard = newCards[i];
+                        const frameKey = getCardFrame(newCard);
+                        cardSprite.setTexture('cards', frameKey);
+                        cardSprite.cardData = newCard;
+                        cardSprite.deselect();
+                    });
+                    this.hintSets = [];
+                    this.addLog('✅ 세트 성공!');
                 } else {
-                    console.log("❌ 세트 실패");
-                    this.selectedCards.forEach(c => c.deselect());
-                    this.selectedCards = [];
+                    selected.forEach(c => c.deselect());
+                    this.addLog('❌ 세트 실패');
                 }
-            }, 500);
+                this.selectedCardSprites = [];
+                this.hintIndex = 0;
+
+            } catch (err) {
+                console.error('서버 통신 오류:', err);
+            }
         }
     }
 
-    checkSet(cards) {
-        return constants.CARD_ATTRS.every(attr => {
-            const values = cards.map(c => c[attr]);
-            const unique = new Set(values);
-            return unique.size === 1 || unique.size === 3;
-        });
+    getCardIds(sprites) {
+        return sprites.map(cs => cs.cardData.id);
     }
 }
 

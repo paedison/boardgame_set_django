@@ -1,4 +1,3 @@
-import itertools
 import random
 
 from rest_framework.decorators import api_view
@@ -11,7 +10,6 @@ from .serializers import CardSerializer
 
 deck = list(Card.objects.all())
 current_cards = []
-hint_index = 0
 
 
 @api_view(['GET'])
@@ -33,10 +31,23 @@ def start_game(request):
 
 @api_view(['POST'])
 def validate_set(request):
-    card_ids = request.data.get('card_ids', [])
-    cards = Card.objects.filter(id__in=card_ids)
-    is_valid = is_valid_set(cards)  # 세트 검증 로직
-    return Response({'is_valid_set': is_valid})
+    global deck, current_cards
+
+    card_ids = request.data.get('cardIds', [])
+    selected_cards = Card.objects.filter(id__in=card_ids)
+
+    new_cards = []
+    if is_valid_set(selected_cards):
+        for card in selected_cards:
+            current_cards.remove(card)
+
+        new_cards = random.sample(deck, 3)
+        current_cards.extend(list(new_cards))
+        for card in new_cards:
+            deck.remove(card)
+
+    serializer = CardSerializer(new_cards, many=True)
+    return Response({'newCards': serializer.data})
 
 
 @api_view(['GET'])
@@ -54,13 +65,5 @@ def show_hint(request):
     for card in current_cards:
         deck.remove(card)
 
-    response_dict['new_cards'] = [card.to_dict() for card in current_cards]
+    response_dict['newCards'] = [card.to_dict() for card in current_cards]
     return Response(response_dict)
-#
-#
-# @api_view(['GET'])
-# def show_hint(request):
-#     cards = Card.objects.all()
-#     sets = find_possible_sets(cards)
-#     hint = [[card.id for card in trio] for trio in sets]
-#     return Response({'possible_sets': hint})
