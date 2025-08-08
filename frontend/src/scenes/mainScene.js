@@ -49,7 +49,7 @@ export class MainScene extends Phaser.Scene {
   update(time, delta) {
     this.updateTimer(delta);
     this.updateUI();
-    this.checkGameState();
+    // this.checkGameState();
   }
 
   handleHotKeys() {
@@ -343,6 +343,7 @@ export class MainScene extends Phaser.Scene {
       this.successCountBox.data.setText(`${this.successCount} 번`);
       
       this.remainingCards -= 3;
+      if (this.remainingCards <= 0) this.remainingCards = 0;
       this.remainingCardsBox.data.setText(`${this.remainingCards} 장`);
       
       this.score += 3;
