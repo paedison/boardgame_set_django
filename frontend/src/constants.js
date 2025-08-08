@@ -8,8 +8,20 @@ function getCardFrame(card) {
 
 export const constants = {
   BASE_URL: 'http://localhost:8000/api/game/',
-  WINDOW_WIDTH: 700,
-  WINDOW_HEIGHT: 800,
+  WINDOW_WIDTH: 800,
+  WINDOW_HEIGHT: 600,
+  
+  X_MARGIN: 55,
+  Y_MARGIN: 40,
+  
+  BUTTON_WIDTH: 170,
+  BUTTON_HEIGHT: 30,
+  BUTTON_MARGIN: 10,
+  
+  TEXTBOX_WIDTH: 170,
+  TEXTBOX_HEIGHT: 30,
+  TEXTBOX_MARGIN: 5,
+  TEXTBOX_BORDER_WIDTH: 2,
   
   BACKGROUND_COLOR: 0xffffff,
   DEFAULT_BORDER_COLOR: 0xeeeeee,
@@ -17,8 +29,7 @@ export const constants = {
   HINTED_BORDER_COLOR: 0xff0000,
   // C_WHITE: (255, 255, 255),
   
-  BORDER_WIDTH: 4,
-  
+  CARD_BORDER_WIDTH: 4,
   CARD_WIDTH: 100,
   CARD_HEIGHT: 150,
   CARD_PADDING: 30,
