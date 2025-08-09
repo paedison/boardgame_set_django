@@ -661,7 +661,7 @@
 	"version": "1.0",
 	"image": "cardsheet",
 	"format": "RGBA8888",
-	"size": {"w":1458,"h":2025},
+	"size": {"w":1458,"h":2250},
 	"scale": "0.4",
 	"smartupdate": "$TexturePacker:SmartUpdate:c51958ee52fa35584c1f7944f40a2da7:96da7477b30c8664bf69c7b516364d7f:81247952c230968261f07beb45de02e2$"
 }

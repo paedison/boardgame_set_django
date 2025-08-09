@@ -8,26 +8,26 @@ from .logic.validator import is_valid_set
 from .models import Card
 from .serializers import CardSerializer
 
-deck = list(Card.objects.all())
+deck = []
 current_cards = []
 
 
 @api_view(['GET'])
-def get_cards(request):
-    cards = Card.objects.all()
-    serializer = CardSerializer(cards, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-def start_game(request):
+def draw_card(request):
     global deck, current_cards
-    deck = list(Card.objects.all())
-    # deck = random.sample(deck, 12)
+
+    game_start = request.GET.get('game_start', '')
+    if game_start:
+        deck = list(Card.objects.all())
+        # deck = random.sample(deck, 12)
+
     current_cards = random.sample(deck, 12)
     for card in current_cards:
         deck.remove(card)
-    return Response({'newCards': [card.to_dict() for card in current_cards]})
+    return Response({
+        'newCards': [card.to_dict() for card in current_cards],
+        'remainingCards': len(deck),
+    })
 
 
 @api_view(['POST'])
@@ -37,7 +37,7 @@ def validate_set(request):
     card_ids = request.data.get('selectedCardIds', [])
     selected_cards = Card.objects.filter(id__in=card_ids)
 
-    response_dict = {'isValidSet': False, 'newCards': []}
+    response_dict = {'isValidSet': False, 'newCards': [], 'remainingCards': len(deck)}
     if is_valid_set(selected_cards):
         response_dict['isValidSet'] = True
         for card in selected_cards:
@@ -50,6 +50,7 @@ def validate_set(request):
                 deck.remove(card)
             serializer = CardSerializer(new_cards, many=True)
             response_dict['newCards'] = serializer.data
+            response_dict['remainingCards'] = len(deck)
 
     return Response(response_dict)
 
