@@ -2,6 +2,7 @@
 
 import {constants} from '../constants.js';
 import {CardSprite, TextButton, TextBox, InformationBox} from './interface.js';
+import {RestartButton, CardChangeButton, HintButton} from './buttonHandler.js';
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -9,14 +10,33 @@ export class MainScene extends Phaser.Scene {
     this.cardSprites = [];
     this.isSelecting = false;
     this.selectedCardSprites = new Set();
+    
+    this.restartButton = null;
+    this.cardChangeButton = null;
+    this.hintButton = null;
+    
     this.hintSets = [];
-    this.elapsedTime = 0;
-    this.remainingCards = 69;
-    this.hintUsedCount = 0;
-    this.successCount = 0;
-    this.failCount = 0;
-    this.score = 0;
     this.logMessages = [];
+    this.messageTextBox = null;
+    
+    this.elapsedTime = 0;
+    this.elapsedTimeBox = null;
+    this.formattedTime = null;
+    
+    this.remainingCards = 69;
+    this.remainingCardsBox = null;
+    
+    this.hintUsedCount = 0;
+    this.hintUsedCountBox = null;
+    
+    this.successCount = 0;
+    this.successCountBox = null;
+    
+    this.failCount = 0;
+    this.failCountBox = null;
+    
+    this.score = 0;
+    this.currentScoreBox = null;
   }
   
   addLog(message, logType = 'normal') {
@@ -29,7 +49,7 @@ export class MainScene extends Phaser.Scene {
     
     this.logMessages.push(message);
     if (this.logMessages.length > 1) this.logMessages.shift(); // 최근 1개만 표시
-    this.logText.label.setText(this.logMessages.join('\n')).setColor(color);
+    this.messageTextBox.label.setText(this.logMessages.join('\n')).setColor(color);
   }
   
   preload() {
@@ -39,9 +59,10 @@ export class MainScene extends Phaser.Scene {
   create() {
     this.handleHotKeys();
     this.createInitialSprites();
-    this.createRestartButton();
-    this.createCardChangeButton();
-    this.createHintButton();
+    this.createButtons();
+    // this.createRestartButton();
+    // this.createCardChangeButton();
+    // this.createHintButton();
     this.createInformationBox();
     this.createFoundSetBox();
   }
@@ -56,13 +77,13 @@ export class MainScene extends Phaser.Scene {
     this.input.keyboard.on('keydown', event => {
       switch (event.code) {
         case 'KeyR':
-          this.processRestartGame();
+          this.restartButton.execute();
           break;
         case 'KeyC':
-          this.processChangeCards();
+          this.cardChangeButton.execute();
           break;
         case 'KeyH':
-          this.processRequestOrShowHint();
+          this.hintButton.execute();
           break;
       }
     });
@@ -81,37 +102,18 @@ export class MainScene extends Phaser.Scene {
       });
   }
   
-  createRestartButton() {
-    const y = constants.Y_MARGIN;
-    this.createActionButton(y, 0x007bff, '다시 시작(R)', this.processRestartGame);
-  }
-  
-  createCardChangeButton() {
-    const y = constants.Y_MARGIN + constants.BUTTON_HEIGHT + constants.BUTTON_MARGIN;
-    this.createActionButton(y, 0xc45816, '카드 교체(C)', this.processChangeCards);
-  }
-  
-  createHintButton() {
-    let y = constants.Y_MARGIN + (constants.BUTTON_HEIGHT + constants.BUTTON_MARGIN) * 2;
-    this.createActionButton(y, 0x28a745, '힌트 보기(H)', this.processRequestOrShowHint);
+  createButtons() {
+    let y = constants.Y_MARGIN;
+    this.restartButton = new RestartButton(this, y, 0x007bff, '다시 시작(R)');
+    
+    y += constants.BUTTON_HEIGHT + constants.BUTTON_MARGIN;
+    this.cardChangeButton = new CardChangeButton(this, y, 0xc45816, '카드 교체(C)');
+
+    y += constants.BUTTON_HEIGHT + constants.BUTTON_MARGIN;
+    this.hintButton = new HintButton(this, y, 0x28a745, '힌트 보기(H)');
     
     y += constants.TEXTBOX_HEIGHT + constants.TEXTBOX_MARGIN;
-    this.logText = new TextBox(this, y);
-  }
-  
-  createActionButton(y, backgroundColor, text, callback) {
-    const button = new TextButton(this, y, { backgroundColor, text });
-    
-    button.bg.on('pointerup', () => {
-      button.bg.disableInteractive();
-      this.tweens.add({
-        targets: button.bg, alpha: 0.5, duration: 250, yoyo: true,
-        onComplete: () => button.bg.setInteractive(),
-      });
-      callback.call(this);
-    });
-    
-    return button;
+    this.messageTextBox = new TextBox(this, y);
   }
 
   createInformationBox() {
@@ -175,114 +177,6 @@ export class MainScene extends Phaser.Scene {
   
   checkGameState() {
     this.cardSprites.forEach(cardSprite => cardSprite.checkBorder());
-  }
-
-  // 단축키 및 버튼 클릭시 동작 기능
-  processRestartGame() {
-    this.changeCards();
-    
-    this.isSelecting = false;
-    this.selectedCardSprites.clear();
-  
-    this.hintSets = [];
-    
-    this.elapsedTime = 0;
-    this.elapsedTimeBox.data.setText('0:00');
-    
-    this.remainingCards = 69;
-    this.remainingCardsBox.data.setText(`${this.remainingCards} 장`);
-    
-    this.hintUsedCount = 0;
-    this.hintUsedCountBox.data.setText(`${this.hintUsedCount} 번`)
-    
-    this.score = 0;
-    this.currentScoreBox.data.setText(`${this.score} 점`);
-    
-    this.logMessages = [];
-    this.logText.label.setText('');
-  }
-  
-  processChangeCards() {
-    this.changeCards();
-    
-    this.isSelecting = false;
-    this.selectedCardSprites.clear();
-
-    this.hintSets = [];
-    this.logText.label.setText('');
-  }
-  
-  changeCards() {
-    let cardSprites = this.cardSprites;
-    
-    fetch(`${constants.BASE_URL}start/`).
-      then(res => res.json()).
-      then(data => {
-        const {newCards} = data;
-        this.tweens.add({
-          targets: cardSprites, alpha: 0, duration: 500, ease: 'Power2',
-          onComplete: () => {
-            cardSprites.forEach((cardSprite, index) => cardSprite.changeCard(newCards[index]));
-            this.tweens.add({targets: cardSprites, alpha: 1, duration: 500, ease: 'Power2'})
-          },
-        });
-      }).
-      catch(error => console.error('게임 시작 데이터 요청 실패:', error));
-
-    this.cardSprites.forEach(cardSprite => cardSprite.deselect());
-  }
-  
-  processRequestOrShowHint() {
-    this.hintSets.length === 0 ? this.requestHint() : this.showHint();
-  }
-  
-  requestHint() {
-    let cardSprites = this.cardSprites;
-    
-    fetch(`${constants.BASE_URL}hint/`).
-      then(res => res.json()).
-      then(data => {
-        const {possibleSets, newCards} = data;
-        
-        if (possibleSets.length === 0) {
-          if (newCards.length === 0) {
-            this.addLog('남은 카드가 없습니다.', 'fail');
-          } else {
-            this.addLog('세트가 없습니다.', 'fail');
-            this.tweens.add({
-              targets: cardSprites, alpha: 0, duration: 500, ease: 'Power2',
-              onComplete: () => {
-                cardSprites.forEach((cardSprite, index) => cardSprite.changeCard(newCards[index]));
-                this.tweens.add({targets: cardSprites, alpha: 1, duration: 500, ease: 'Power2'})
-                },
-            });
-          }
-        } else {
-          this.hintSets = possibleSets; // [[id1, id2, id3], [id4, id5, id6], ...]
-          this.showHint();
-        }
-      });
-  }
-  
-  showHint() {
-    this.hintUsedCount += 1;
-    this.addLog(`세트가 ${this.hintSets.length}개 있습니다.`, 'success');
-    this.hintUsedCountBox.data.setText(`${this.hintUsedCount} 번`);
-    this.showHintSprites();
-  }
-  
-  showHintSprites() {
-    let hintSprites = [];
-    this.hintSets.forEach(hintSet => {
-      let spriteIds = [];
-      hintSet.forEach(cardId => {
-        this.cardSprites.forEach(cardSprite => {
-          if (cardSprite.cardData.id === cardId) spriteIds.push(cardSprite.index)
-        })
-      })
-      hintSprites.push(spriteIds);
-    });
-    console.log(hintSprites);
   }
 
   async handleCardSelection(cardSprite) {
